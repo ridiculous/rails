@@ -47,7 +47,7 @@ module ActiveStorage
       #     has_one_attached :avatar, strict_loading: true
       #   end
       #
-      def has_one_attached(name, dependent: :purge_later, service: nil, strict_loading: false)
+      def has_one_attached(name, dependent: :purge_later, service: nil, strict_loading: false, database: nil)
         validate_service_configuration(name, service)
 
         generated_association_methods.class_eval <<-CODE, __FILE__, __LINE__ + 1
