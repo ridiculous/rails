@@ -134,7 +134,9 @@ module ActiveStorage
       #     has_many_attached :photos, strict_loading: true
       #   end
       #
-      def has_many_attached(name, dependent: :purge_later, service: nil, strict_loading: false)
+      def has_many_attached(name, dependent: :purge_later, service: nil, strict_loading: false,
+                            attachment_model: ActiveStorage::Attachment,
+                            blob_model: ActiveStorage::Blob)
         validate_service_configuration(name, service)
 
         generated_association_methods.class_eval <<-CODE, __FILE__, __LINE__ + 1
@@ -152,7 +154,7 @@ module ActiveStorage
                 if attachables.none?
                   ActiveStorage::Attached::Changes::DeleteMany.new("#{name}", self)
                 else
-                  ActiveStorage::Attached::Changes::CreateMany.new("#{name}", self, attachables)
+                  ActiveStorage::Attached::Changes::CreateMany.new("#{name}", self, attachables, #{blob_model}, #{attachment_model})
                 end
             else
               ActiveSupport::Deprecation.warn \
@@ -163,13 +165,13 @@ module ActiveStorage
 
               if attachables.any?
                 attachment_changes["#{name}"] =
-                  ActiveStorage::Attached::Changes::CreateMany.new("#{name}", self, #{name}.blobs + attachables)
+                  ActiveStorage::Attached::Changes::CreateMany.new("#{name}", self, #{name}.blobs + attachables, #{blob_model}, #{attachment_model})
               end
             end
           end
         CODE
 
-        has_many :"#{name}_attachments", -> { where(name: name) }, as: :record, class_name: "ActiveStorage::Attachment", inverse_of: :record, dependent: :destroy, strict_loading: strict_loading do
+        has_many :"#{name}_attachments", -> { where(name: name) }, as: :record, class_name: attachment_model.name, inverse_of: :record, dependent: :destroy, strict_loading: strict_loading do
           def purge
             deprecate(:purge)
             each(&:purge)
@@ -192,7 +194,7 @@ module ActiveStorage
             MSG
           end
         end
-        has_many :"#{name}_blobs", through: :"#{name}_attachments", class_name: "ActiveStorage::Blob", source: :blob, strict_loading: strict_loading
+        has_many :"#{name}_blobs", through: :"#{name}_attachments", class_name: blob_model.name, source: :blob, strict_loading: strict_loading
 
         scope :"with_attached_#{name}", -> {
           if ActiveStorage.track_variants
