@@ -7,8 +7,10 @@ module ActiveStorage
   class Attached::Changes::CreateOne # :nodoc:
     attr_reader :name, :record, :attachable
 
-    def initialize(name, record, attachable)
+    def initialize(name, record, attachable, blob_model = nil, attachment_model = nil)
       @name, @record, @attachable = name, record, attachable
+      @blob_model = blob_model
+      @attachment_model = attachment_model
       blob.identify_without_saving
     end
 
@@ -46,15 +48,15 @@ module ActiveStorage
       end
 
       def build_attachment
-        ActiveStorage::Attachment.new(record: record, name: name, blob: blob)
+        @attachment_model.new(record: record, name: name, blob: blob)
       end
 
       def find_or_build_blob
         case attachable
         when ActiveStorage::Blob
-          attachable
+          attachable.becomes(@blob_model)
         when ActionDispatch::Http::UploadedFile, Rack::Test::UploadedFile
-          ActiveStorage::Blob.build_after_unfurling(
+          @blob_model.build_after_unfurling(
             io: attachable.open,
             filename: attachable.original_filename,
             content_type: attachable.content_type,
@@ -62,14 +64,14 @@ module ActiveStorage
             service_name: attachment_service_name
           )
         when Hash
-          ActiveStorage::Blob.build_after_unfurling(
+          @blob_model.build_after_unfurling(
             **attachable.reverse_merge(
               record: record,
               service_name: attachment_service_name
             ).symbolize_keys
           )
         when String
-          ActiveStorage::Blob.find_signed!(attachable, record: record)
+          @blob_model.find_signed!(attachable, record: record)
         else
           raise ArgumentError, "Could not find or build blob: expected attachable, got #{attachable.inspect}"
         end

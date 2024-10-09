@@ -47,7 +47,9 @@ module ActiveStorage
       #     has_one_attached :avatar, strict_loading: true
       #   end
       #
-      def has_one_attached(name, dependent: :purge_later, service: nil, strict_loading: false, database: nil)
+      def has_one_attached(name, dependent: :purge_later, service: nil, strict_loading: false,
+                           attachment_model: ActiveStorage::Attachment,
+                           blob_model: ActiveStorage::Blob)
         validate_service_configuration(name, service)
 
         generated_association_methods.class_eval <<-CODE, __FILE__, __LINE__ + 1
@@ -62,13 +64,13 @@ module ActiveStorage
               if attachable.nil?
                 ActiveStorage::Attached::Changes::DeleteOne.new("#{name}", self)
               else
-                ActiveStorage::Attached::Changes::CreateOne.new("#{name}", self, attachable)
+                ActiveStorage::Attached::Changes::CreateOne.new("#{name}", self, attachable, #{blob_model}, #{attachment_model})
               end
           end
         CODE
 
-        has_one :"#{name}_attachment", -> { where(name: name) }, class_name: "ActiveStorage::Attachment", as: :record, inverse_of: :record, dependent: :destroy, strict_loading: strict_loading
-        has_one :"#{name}_blob", through: :"#{name}_attachment", class_name: "ActiveStorage::Blob", source: :blob, strict_loading: strict_loading
+        has_one :"#{name}_attachment", -> { where(name: name) }, class_name: attachment_model.name, as: :record, inverse_of: :record, dependent: :destroy, strict_loading: strict_loading
+        has_one :"#{name}_blob", through: :"#{name}_attachment", class_name: blob_model.name, source: :blob, strict_loading: strict_loading
 
         scope :"with_attached_#{name}", -> {
           if ActiveStorage.track_variants
